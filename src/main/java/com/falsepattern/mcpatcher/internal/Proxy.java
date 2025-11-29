@@ -23,9 +23,11 @@
 package com.falsepattern.mcpatcher.internal;
 
 import com.falsepattern.mcpatcher.Tags;
-import com.falsepattern.mcpatcher.internal.config.MCPatcherConfig;
+import com.falsepattern.mcpatcher.internal.config.ModuleConfig;
+import com.falsepattern.mcpatcher.internal.modules.cit.CITEngine;
 import com.falsepattern.mcpatcher.internal.modules.mob.MobEngine;
 import lombok.val;
+import lombok.var;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.resources.IReloadableResourceManager;
@@ -45,36 +47,58 @@ public class Proxy {
 
     public static class Client extends Proxy {
         private boolean connectedTextures;
+        private boolean customItemTextures;
         private boolean randomMobs;
+
         @Override
         public void postInit(FMLPostInitializationEvent event) {
             val mc = Minecraft.getMinecraft();
             val resMan = (IReloadableResourceManager) mc.getResourceManager();
             resMan.registerReloadListener(this::reloadResources);
-            connectedTextures = MCPatcherConfig.connectedTextures;
-            randomMobs = MCPatcherConfig.randomMobs;
-            FMLCommonHandler.instance().bus().register(this);
+
+            connectedTextures = ModuleConfig.isConnectedTexturesEnabled();
+            customItemTextures = ModuleConfig.isCustomItemTexturesEnabled();
+            randomMobs = ModuleConfig.isRandomMobsEnabled();
+
+            FMLCommonHandler.instance()
+                            .bus()
+                            .register(this);
         }
 
         @SubscribeEvent
         public void onConfigCache(ConfigChangedEvent.PostConfigChangedEvent e) {
-            if (!Tags.MOD_ID.equals(e.modID))
+            if (!Tags.MOD_ID.equals(e.modID)) {
                 return;
-            //Refresh resources when:
-            // - Connected textures are enabled/disabled
-            // - Random mobs are disabled (textures are dynamically loaded,
-            //   so we reload when disabling to clear vram)
-            if (connectedTextures != MCPatcherConfig.connectedTextures ||
-                (randomMobs && !MCPatcherConfig.randomMobs)) {
-                Minecraft.getMinecraft().scheduleResourcesRefresh();
             }
-            connectedTextures = MCPatcherConfig.connectedTextures;
-            randomMobs = MCPatcherConfig.randomMobs;
+
+            // Refresh resources when:
+            // - Connected textures are enabled/disabled
+            // - Custom item textures are enabled/disabled
+            // - Random mobs are disabled
+            //   (textures are dynamically loaded,so we reload when disabling to clear vram)
+            var doResourceRefresh = false;
+            doResourceRefresh |= connectedTextures != ModuleConfig.isConnectedTexturesEnabled();
+            doResourceRefresh |= customItemTextures != ModuleConfig.isCustomItemTexturesEnabled();
+            doResourceRefresh |= randomMobs && !ModuleConfig.isRandomMobsEnabled();
+
+            if (doResourceRefresh) {
+                Minecraft.getMinecraft()
+                         .scheduleResourcesRefresh();
+            }
+
+            connectedTextures = ModuleConfig.isConnectedTexturesEnabled();
+            customItemTextures = ModuleConfig.isCustomItemTexturesEnabled();
+            randomMobs = ModuleConfig.isRandomMobsEnabled();
         }
 
         private void reloadResources(IResourceManager resourceManager) {
             Share.log.debug("Reloading Resources");
-            if (MCPatcherConfig.randomMobs && MCPatcherConfig.randomMobsMixins) {
+
+            if (ModuleConfig.isCustomItemTexturesEnabled()) {
+                CITEngine.reloadResources();
+            }
+
+            if (ModuleConfig.isRandomMobsEnabled()) {
                 MobEngine.reloadResources();
             }
         }

@@ -33,7 +33,6 @@ import java.util.function.Consumer;
 
 public enum TargetMod implements ITargetMod {
     DamageIndicators("DamageIndicatorsMod.DIMod"),
-    wdmla("com.gtnewhorizons.wdmla.WDMla"),
     ;
 
     @Getter

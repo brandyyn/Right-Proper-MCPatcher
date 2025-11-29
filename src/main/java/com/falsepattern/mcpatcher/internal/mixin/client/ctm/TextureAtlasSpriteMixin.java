@@ -20,15 +20,26 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package com.falsepattern.mcpatcher.internal.config;
+package com.falsepattern.mcpatcher.internal.mixin.client.ctm;
 
-import com.falsepattern.lib.config.SimpleGuiFactory;
+import com.falsepattern.mcpatcher.internal.modules.ctm.ICTMSprite;
+import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Unique;
 
-import net.minecraft.client.gui.GuiScreen;
+import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 
-public class MCPatcherGuiFactory implements SimpleGuiFactory {
+@Mixin(TextureAtlasSprite.class)
+public abstract class TextureAtlasSpriteMixin implements ICTMSprite {
+    @Unique
+    private int mcp$indexInMap = -1;
+
     @Override
-    public Class<? extends GuiScreen> mainConfigGuiClass() {
-        return MCPatcherGuiConfig.class;
+    public int mcp$indexInMap() {
+        return mcp$indexInMap;
+    }
+
+    @Override
+    public void mcp$indexInMap(int index) {
+        mcp$indexInMap = index;
     }
 }

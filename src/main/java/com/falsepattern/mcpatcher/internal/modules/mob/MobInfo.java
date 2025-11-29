@@ -36,7 +36,6 @@ import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.val;
 import lombok.var;
-import org.apache.commons.lang3.StringUtils;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -53,20 +52,6 @@ public class MobInfo {
     private static final String ENTITY_PATH_PREFIX = "textures/entity/";
     private static final String MCPATCHER_MOB_PATH_PREFIX = "mcpatcher/mob/";
 
-    /**
-     * Aliases for properties so people can use just one
-     */
-    private static final String[] PROP_ALIASES = {"",
-                                                  "_eyes",
-                                                  "_overlay",
-                                                  "_tame",
-                                                  "_angry",
-                                                  "_collar",
-                                                  "_fur",
-                                                  "_invulnerable",
-                                                  "_shooting"};
-
-    private final @NotNull String name;
     private final @NotNull ResourceLocation @NotNull [] textures;
     private final @Nullable WeightedRandom weights;
     private final @Nullable IntRange.List heights;
@@ -84,8 +69,6 @@ public class MobInfo {
         if (!"minecraft".equals(domain)) {
             return null;
         }
-        MobEngine.LOG.debug("Loading resources for: {}", resource);
-
         val path = resource.getResourcePath();
         if (path == null || !path.startsWith(ENTITY_PATH_PREFIX)) {
             return null;
@@ -102,24 +85,17 @@ public class MobInfo {
             }
             val hasBaseTexture = pack.resourceExists(resource);
             ObjectList<MobInfo> result = null;
-            for (val alias : PROP_ALIASES) {
-                val aliasedPrefix = prefix.substring(0, prefix.length() - alias.length());
-                val propFile = new ResourceLocation(aliasedPrefix + ".properties");
-                if (!pack.resourceExists(propFile)) {
-                    continue;
-                }
-
+            val propFile = new ResourceLocation(prefix + ".properties");
+            if (pack.resourceExists(propFile)) {
                 val properties = new Properties();
                 try {
-                    MobEngine.LOG.debug("From prop file: {}", propFile);
                     properties.load(pack.getInputStream(propFile));
                 } catch (IOException e) {
                     CommonParser.LOG.warn("Failed to parse {}", propFile.toString());
                     CommonParser.LOG.warn("Stacktrace:", e);
                 }
                 result = fromProperties(properties, resource, prefix);
-            }
-            if (result == null) {
+            } else {
                 val info = fromTextures(resource, pack, prefix);
                 if (info != null) {
                     result = ObjectLists.singleton(info);
@@ -138,46 +114,30 @@ public class MobInfo {
     private static @NotNull ObjectList<@NotNull MobInfo> fromProperties(@NotNull Properties props,
                                                                         @NotNull ResourceLocation resource,
                                                                         @NotNull String prefix) {
-        val baseName = StringUtils.substringAfterLast(prefix, "/") + ".";
-        val result = new ObjectArrayList<MobInfo>();
-        for (var i = 1; i < Integer.MAX_VALUE; i++) {
-            val skins = CommonParser.parseInts(props.getProperty("skins." + i), 0, 0xFFFF);
+        ObjectList<MobInfo> result = new ObjectArrayList<>();
+        for (int i = 1; i < Integer.MAX_VALUE; i++) {
+            val skins = CommonParser.parseInts(props.getProperty("skins." + i));
             if (skins == null) {
                 break;
             }
-            val weightInts = CommonParser.parseInts(props.getProperty("weights." + i), 0, 0xFFFF);
+            val weightInts = CommonParser.parseInts(props.getProperty("weights." + i));
             val biomesList = CommonParser.parseBiomes(props.getProperty("biomes." + i));
-
-            var heights = CommonParser.parseIntRanges(props.getProperty("heights." + i));
-            if (heights == null) {
-                val minHeight = CommonParser.parseInt(props.getProperty("minHeight." + i), Integer.MIN_VALUE);
-                val maxHeight = CommonParser.parseInt(props.getProperty("maxHeight." + i), Integer.MAX_VALUE);
-                if (minHeight != Integer.MIN_VALUE || maxHeight != Integer.MAX_VALUE) {
-                    heights = new IntRange.List();
-                    heights.add(new IntRange(minHeight, maxHeight));
-                }
-            }
-
+            val heights = CommonParser.parseIntRanges(props.getProperty("heights." + i));
             var weights = weightInts == null ? null : new WeightedRandom(weightInts, skins.size() + 1);
             val biomes = biomesList == null ? null : new ObjectOpenHashSet<>(biomesList);
             val skinsList = new ObjectArrayList<ResourceLocation>();
             val iter = skins.intIterator();
             while (iter.hasNext()) {
                 val j = iter.nextInt();
-                val replacementResource = new ResourceLocation(prefix + j + ".png");
-                if (ResourceScanner.hasResource(replacementResource)) {
-                    skinsList.add(replacementResource);
-                    MobEngine.LOG.debug("Added custom texture: {}", replacementResource);
-                } else if (j == 1) {
+                if (j == 1) {
                     skinsList.add(resource);
-                    MobEngine.LOG.debug("Added default texture: {}", resource);
                 } else {
-                    MobEngine.LOG.warn("Missing custom texture: {}", replacementResource);
+                    skinsList.add(new ResourceLocation(prefix + j + ".png"));
                 }
             }
-            result.add(new MobInfo(baseName + i, skinsList.toArray(new ResourceLocation[0]), weights, heights, biomes));
+            result.add(new MobInfo(skinsList.toArray(new ResourceLocation[0]), weights, heights, biomes));
         }
-        result.add(new MobInfo(baseName + 0, new ResourceLocation[]{resource}, null, null, null));
+        result.add(new MobInfo(new ResourceLocation[]{resource}, null, null, null));
         return result;
     }
 
@@ -188,22 +148,13 @@ public class MobInfo {
         if (names.isEmpty()) {
             return null;
         }
-        MobEngine.LOG.debug("From path directly");
         names.sort(Comparator.naturalOrder());
         val res = new ObjectArrayList<ResourceLocation>();
         res.add(resource);
-        MobEngine.LOG.debug("Added default texture: {}", resource);
         for (val name : names) {
-            val replacementResource = new ResourceLocation(name);
-            if (ResourceScanner.hasResource(replacementResource)) {
-                res.add(replacementResource);
-                MobEngine.LOG.debug("Added custom texture: {}", replacementResource);
-            } else {
-                MobEngine.LOG.warn("Missing custom texture: {}", replacementResource);
-            }
+            res.add(new ResourceLocation(name));
         }
-        val name = StringUtils.substringAfterLast(prefix, "/") + ".0";
-        return new MobInfo(name, res.toArray(new ResourceLocation[0]), null, null, null);
+        return new MobInfo(res.toArray(new ResourceLocation[0]), null, null, null);
     }
 
     public ResourceLocation getTextureFor(TrackedEntity entity) {

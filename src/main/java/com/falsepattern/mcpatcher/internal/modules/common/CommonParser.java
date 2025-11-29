@@ -27,9 +27,7 @@ import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntList;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectList;
-import lombok.RequiredArgsConstructor;
 import lombok.val;
-import lombok.var;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -41,7 +39,6 @@ import net.minecraft.world.biome.BiomeGenBase;
 
 public class CommonParser {
     public static final Logger LOG = LogManager.getLogger(Tags.MOD_NAME + " Parser");
-    public static final long PARSE_SENTINEL_VALUE = 0xFF_00000000L;
 
     private CommonParser() {
         throw new AssertionError("Utility class");
@@ -55,9 +52,6 @@ public class CommonParser {
         if (str == null) {
             return defVal;
         } else {
-            if (str.startsWith("(") && str.endsWith(")")) {
-                str = str.substring(1, str.length() - 1);
-            }
             try {
                 return Integer.parseInt(str);
             } catch (NumberFormatException ignored) {
@@ -66,40 +60,12 @@ public class CommonParser {
         }
     }
 
-    public static long parseIntSentinel(@NotNull String str) {
-        if (str.startsWith("(") && str.endsWith(")")) {
-            str = str.substring(1, str.length() - 1);
-        }
-
-        try {
-            return Integer.parseInt(str);
-        } catch (NumberFormatException ignored) {
-            return PARSE_SENTINEL_VALUE;
-        }
-    }
-
-    public static float parseFloat(@Nullable String str, float defVal) {
-        if (str == null) {
-            return defVal;
-        } else {
-            try {
-                return Float.parseFloat(str);
-            } catch (NumberFormatException ignored) {
-                return defVal;
-            }
-        }
-    }
-
     public static boolean parseBoolean(@Nullable String str) {
-        return parseBoolean(str, false);
-    }
-
-    public static boolean parseBoolean(@Nullable String str, boolean def) {
-        return str != null ? str.equalsIgnoreCase("true") : def;
+        return str != null && str.equalsIgnoreCase("true");
     }
 
     @Contract("!null -> !null; null -> null")
-    public static @Nullable IntList parseInts(@Nullable String str, int minBound, int maxBound) {
+    public static @Nullable IntList parseInts(@Nullable String str) {
         if (str == null) {
             return null;
         }
@@ -107,107 +73,81 @@ public class CommonParser {
         String[] intStrs = StringUtils.split(str, " ,");
 
         for (val intStr : intStrs) {
-            val range = tokenizeRange(intStr);
-            if (range == null) {
-                LOG.warn("when parsing: {}", str);
-                continue;
-            }
-            long min = (range.start != null) ? parseIntSentinel(range.start) : minBound;
-            long max = (range.end != null) ? parseIntSentinel(range.end) : maxBound;
-            if (min != PARSE_SENTINEL_VALUE && max != PARSE_SENTINEL_VALUE && min <= max) {
-                for (int n = (int) min; n <= max; n++) {
-                    list.add(n);
+            if (intStr.contains("-")) {
+                String[] subStrs = StringUtils.split(intStr, "-");
+                if (subStrs.length != 2) {
+                    LOG.warn("Invalid interval: {}, when parsing: {}", intStr, str);
+                } else {
+                    int min = parseInt(subStrs[0], -1);
+                    int max = parseInt(subStrs[1], -1);
+                    if (min >= 0 && max >= 0 && min <= max) {
+                        for (int n = min; n <= max; ++n) {
+                            list.add(n);
+                        }
+                    } else {
+                        LOG.warn("Invalid interval: {}, when parsing: {}", intStr, str);
+                    }
                 }
             } else {
-                LOG.warn("Invalid inverval: {}, when parsing: {}", intStr, str);
+                int val = parseInt(intStr, -1);
+                if (val < 0) {
+                    LOG.warn("Invalid number: {}, when parsing: {}", intStr, str);
+                } else {
+                    list.add(val);
+                }
             }
         }
+
         return list;
     }
 
     public static IntRange.@Nullable List parseIntRanges(@Nullable String str) {
         if (str == null) {
             return null;
-        }
-        IntRange.List list = new IntRange.List();
-        String[] parts = StringUtils.split(str, " ,");
+        } else {
+            IntRange.List list = new IntRange.List();
+            String[] parts = StringUtils.split(str, " ,");
 
-        for (val part : parts) {
-            val ri = parseIntRange(part);
-            if (ri == null) {
-                return null;
+            for (val part : parts) {
+                val ri = parseIntRange(part);
+                if (ri == null) {
+                    return null;
+                }
+
+                list.add(ri);
             }
 
-            list.add(ri);
+            return list;
         }
-
-        return list;
     }
 
     public static @Nullable IntRange parseIntRange(@Nullable String str) {
         if (str == null) {
             return null;
-        }
-        val range = tokenizeRange(str);
-        if (range == null) {
-            return null;
-        }
-        long min = (range.start != null) ? parseIntSentinel(range.start) : Integer.MIN_VALUE;
-        long max = (range.end != null) ? parseIntSentinel(range.end) : Integer.MAX_VALUE;
-        if (min != PARSE_SENTINEL_VALUE && max != PARSE_SENTINEL_VALUE) {
-            return new IntRange((int) min, (int) max);
+        } else if (str.indexOf(45) >= 0) {
+            String[] parts = StringUtils.split(str, "-");
+            if (parts.length != 2) {
+                LOG.warn("Invalid range: {}", str);
+                return null;
+            } else {
+                int min = parseInt(parts[0], -1);
+                int max = parseInt(parts[1], -1);
+                if (min >= 0 && max >= 0) {
+                    return new IntRange(min, max);
+                } else {
+                    LOG.warn("Invalid range: {}", str);
+                    return null;
+                }
+            }
         } else {
-            LOG.warn("Invalid range: {}", str);
-            return null;
-        }
-    }
-
-    private static @Nullable TokenizedRange tokenizeRange(String str) {
-        String start = null;
-        String end = null;
-        val len = str.length();
-        var inParen = false;
-        var preDash = true;
-        int dashOffset = -1;
-        for (int i = 0; i < len; i++) {
-            val ch = str.charAt(i);
-            switch (ch) {
-                case '(':
-                    if (inParen) {
-                        LOG.warn("Nested parentheses are not supported: {}", str);
-                        return null;
-                    }
-                    inParen = true;
-                    break;
-                case ')':
-                    if (!inParen) {
-                        LOG.warn("Closing ) without a matching (: {}", str);
-                        return null;
-                    }
-                    inParen = false;
-                    break;
-                case '-':
-                    if (inParen) {
-                        continue;
-                    }
-                    if (!preDash) {
-                        LOG.warn("Multiple - separators: {}", str);
-                        return null;
-                    }
-                    dashOffset = i + 1;
-                    if (i != 0) {
-                        start = str.substring(0, i);
-                    }
-                    continue;
+            int val = parseInt(str, -1);
+            if (val < 0) {
+                LOG.warn("Invalid integer: {}", str);
+                return null;
+            } else {
+                return new IntRange(val, val);
             }
         }
-        if (dashOffset == -1) {
-            return new TokenizedRange(str, str);
-        }
-        if (dashOffset < len) {
-            end = str.substring(dashOffset, len);
-        }
-        return new TokenizedRange(start, end);
     }
 
     @Contract("!null -> !null")
@@ -246,11 +186,5 @@ public class CommonParser {
         }
 
         return null;
-    }
-
-    @RequiredArgsConstructor
-    private static class TokenizedRange {
-        public final String start;
-        public final String end;
     }
 }

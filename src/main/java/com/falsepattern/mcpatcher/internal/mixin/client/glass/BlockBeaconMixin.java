@@ -20,15 +20,23 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package com.falsepattern.mcpatcher.internal.config;
+package com.falsepattern.mcpatcher.internal.mixin.client.glass;
 
-import com.falsepattern.lib.config.SimpleGuiFactory;
+import com.falsepattern.mcpatcher.internal.config.MCPatcherConfig;
+import org.spongepowered.asm.mixin.Mixin;
 
-import net.minecraft.client.gui.GuiScreen;
+import net.minecraft.block.BlockBeacon;
+import net.minecraft.block.BlockContainer;
+import net.minecraft.block.material.Material;
 
-public class MCPatcherGuiFactory implements SimpleGuiFactory {
+@Mixin(BlockBeacon.class)
+public abstract class BlockBeaconMixin extends BlockContainer {
+    protected BlockBeaconMixin(Material materialIn) {
+        super(materialIn);
+    }
+
     @Override
-    public Class<? extends GuiScreen> mainConfigGuiClass() {
-        return MCPatcherGuiConfig.class;
+    public int getRenderBlockPass() {
+        return MCPatcherConfig.betterGlass ? 1 : super.getRenderBlockPass();
     }
 }

@@ -20,15 +20,27 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package com.falsepattern.mcpatcher.internal.config;
+package com.falsepattern.mcpatcher.internal.mixin.client.glass;
 
-import com.falsepattern.lib.config.SimpleGuiFactory;
+import com.falsepattern.mcpatcher.internal.config.MCPatcherConfig;
+import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.injection.Constant;
+import org.spongepowered.asm.mixin.injection.ModifyConstant;
 
-import net.minecraft.client.gui.GuiScreen;
+import net.minecraft.block.BlockBreakable;
+import net.minecraft.block.BlockGlass;
+import net.minecraft.block.material.Material;
 
-public class MCPatcherGuiFactory implements SimpleGuiFactory {
-    @Override
-    public Class<? extends GuiScreen> mainConfigGuiClass() {
-        return MCPatcherGuiConfig.class;
+@Mixin(BlockGlass.class)
+public abstract class BlockGlassMixin extends BlockBreakable {
+    protected BlockGlassMixin(String name, Material material, boolean b) {
+        super(name, material, b);
+    }
+
+    @ModifyConstant(method = "getRenderBlockPass",
+                    constant = @Constant(intValue = 0),
+                    require = 1)
+    private int getPass(int constant) {
+        return MCPatcherConfig.betterGlass ? 1 : constant;
     }
 }

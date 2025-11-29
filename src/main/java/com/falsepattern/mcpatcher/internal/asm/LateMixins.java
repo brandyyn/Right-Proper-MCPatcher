@@ -20,15 +20,25 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package com.falsepattern.mcpatcher.internal.config;
+package com.falsepattern.mcpatcher.internal.asm;
 
-import com.falsepattern.lib.config.SimpleGuiFactory;
+import com.gtnewhorizon.gtnhmixins.ILateMixinLoader;
+import com.gtnewhorizon.gtnhmixins.LateMixin;
+import com.gtnewhorizon.gtnhmixins.builders.IMixins;
+import org.jetbrains.annotations.NotNull;
 
-import net.minecraft.client.gui.GuiScreen;
+import java.util.List;
+import java.util.Set;
 
-public class MCPatcherGuiFactory implements SimpleGuiFactory {
+@LateMixin
+public class LateMixins implements ILateMixinLoader {
     @Override
-    public Class<? extends GuiScreen> mainConfigGuiClass() {
-        return MCPatcherGuiConfig.class;
+    public String getMixinConfig() {
+        return "mixins.mcpatcher.late.json";
+    }
+
+    @Override
+    public @NotNull List<String> getMixins(Set<String> loadedMods) {
+        return IMixins.getLateMixins(Mixin.class, loadedMods);
     }
 }

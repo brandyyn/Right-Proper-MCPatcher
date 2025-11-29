@@ -23,12 +23,13 @@
 package com.falsepattern.mcpatcher.internal.modules.ctm;
 
 import com.falsepattern.mcpatcher.Tags;
-import com.falsepattern.mcpatcher.internal.modules.common.Identity2ObjectHashMap;
 import com.falsepattern.mcpatcher.internal.modules.common.MCPMath;
 import com.falsepattern.mcpatcher.internal.modules.common.ResourceScanner;
 import com.falsepattern.mcpatcher.internal.modules.overlay.ResourceGenerator;
+import it.unimi.dsi.fastutil.Hash;
 import it.unimi.dsi.fastutil.ints.IntList;
 import it.unimi.dsi.fastutil.objects.Object2ObjectMap;
+import it.unimi.dsi.fastutil.objects.Object2ObjectOpenCustomHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectList;
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
@@ -63,7 +64,20 @@ import java.util.Properties;
 public class CTMEngine {
     static final Logger LOG = LogManager.getLogger(Tags.MOD_NAME + " CTM");
 
-    private static final Object2ObjectMap<Block, ObjectList<CTMInfo>> blockProperties = new Identity2ObjectHashMap<>();
+    private static final Object2ObjectMap<Block, ObjectList<CTMInfo>> blockProperties = new Object2ObjectOpenCustomHashMap<>(
+            128,
+            0.1f,
+            new Hash.Strategy<Block>() {
+                @Override
+                public int hashCode(Block o) {
+                    return System.identityHashCode(o);
+                }
+
+                @Override
+                public boolean equals(Block a, Block b) {
+                    return a == b;
+                }
+            });
     private static final ObjectList<ObjectList<CTMInfo>> tileProperties = new ObjectArrayList<>();
     private static boolean multipass = false;
 
@@ -661,9 +675,6 @@ public class CTMEngine {
                 return neighbourBlock.getMaterial() == block.getMaterial();
             }
         } else {
-            // TODO: Related to https://github.com/vfx-dev/Right-Proper-MCPatcher/issues/9
-            //       Should natural blocks have special handling?
-            //       Ensure that @Houston and @DarkBumus are happy with any changes made.
             return neighbourBlock == block && iblockaccess.getBlockMetadata(x, y, z) == metadata;
         }
     }

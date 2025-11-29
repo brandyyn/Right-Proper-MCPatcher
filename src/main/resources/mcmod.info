@@ -8,10 +8,9 @@
     "url": "https://github.com/vfx-dev/Right-Proper-MCPatcher",
     "updateUrl": "",
     "authorList": [
-      "FalsePattern",
-      "Ventooth"
+      "FalsePattern"
     ],
-    "credits": "prupe for OG MCPatcher, mist475 for MCPatcherForge. DarkBumus for testing and bug reports",
+    "credits": "",
     "logoFile": "mcpatcher.png",
     "screenshots": [],
     "dependencies": []
